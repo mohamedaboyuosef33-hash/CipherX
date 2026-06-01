@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Crypto Toolkit</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet"/>
+<!-- CryptoJS for AES, DES, 3DES, SHA, HMAC -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<!-- JSEncrypt for RSA -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsencrypt/3.3.2/jsencrypt.min.js"></script>
+
+<style>
+/* ============================================================
+   ROOT VARIABLES – color palette & font sizes
+   ============================================================ */
+:root {
+  --bg: #050a0f;           /* Near-black background          */
+  --panel: #0a1520;        /* Card/panel background           */
+  --border: #0d3350;       /* Subtle border color             */
+  --accent: #00d4ff;       /* Cyan – primary accent           */
+  --accent2: #00ff99;      /* Green – secondary accent        */
+  --accent3: #ff6b35;      /* Orange – warning / RSA          */
+  --text: #c8e6f0;         /* Main text                       */
+  --muted: #4a7a99;        /* Dimmed / placeholder text       */
+  --glow: 0 0 20px rgba(0,212,255,0.4);
+  --glow2: 0 0 20px rgba(0,255,153,0.3);
+}
+
+/* ============================================================
+   GLOBAL RESET & BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Exo 2', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Animated grid background */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+header {
+  position: relative; z-index: 10;
+  text-align: center;
+  padding: 3rem 1rem 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+header::after {
+  content: '';
+  display: block;
+  width: 200px; height: 2px;
+  margin: 1rem auto 0;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+}
+
+.logo {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  /* glowing text gradient */
+  background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 4s linear infinite;
+}
+
+@keyframes shimmer { to { background-position: 200% center; } }
+
+.subtitle {
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.3em;
+  margin-top: 0.4rem;
+}
+
+/* ============================================================
+   TAB NAVIGATION
+   ============================================================ */
+nav {
+  position: relative; z-index: 10;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem;
+  padding: 1.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab-btn {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 0.6rem 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.25s;
+  text-transform: uppercase;
+  position: relative;
+  overflow: hidden;
+}
+
+/* hover ripple effect */
+.tab-btn::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.tab-btn:hover::before { opacity: 0.08; }
+.tab-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+.tab-btn.active {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: var(--glow);
+}
+
+/* ============================================================
+   MAIN LAYOUT
+   ============================================================ */
+main {
+  position: relative; z-index: 10;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+/* Tab panels – only active one shown */
+.tab-panel { display: none; animation: fadeIn 0.3s ease; }
+.tab-panel.active { display: block; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+
+/* ============================================================
+   SECTION CARD
+   ============================================================ */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1.8rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+
+/* Left accent stripe */
+.card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 10%; bottom: 10%;
+  width: 2px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.card.green::before { background: var(--accent2); }
+.card.orange::before { background: var(--accent3); }
+
+.card-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1.2rem;
+}
+.card.green .card-title  { color: var(--accent2); }
+.card.orange .card-title { color: var(--accent3); }
+
+/* ============================================================
+   FORM ELEMENTS
+   ============================================================ */
+label {
+  display: block;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+  letter-spacing: 0.15em;
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
+}
+
+input[type="text"], input[type="password"], textarea, select {
+  width: 100%;
+  background: rgba(0,212,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.85rem;
+  padding: 0.6rem 0.8rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  margin-bottom: 1rem;
+  resize: vertical;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0,212,255,0.12);
+}
+select option { background: var(--panel); }
+
+.row { display: flex; gap: 1rem; flex-wrap: wrap; }
+.row > * { flex: 1; min-width: 160px; }
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.65rem 1.5rem;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.btn:hover {
+  background: var(--accent);
+  color: var(--bg);
+  box-shadow: var(--glow);
+}
+.btn.green { border-color: var(--accent2); color: var(--accent2); }
+.btn.green:hover { background: var(--accent2); color: var(--bg); box-shadow: var(--glow2); }
+.btn.orange { border-color: var(--accent3); color: var(--accent3); }
+.btn.orange:hover { background: var(--accent3); color: var(--bg); }
+.btn.full { width: 100%; text-align: center; margin-right: 0; }
+
+/* ============================================================
+   OUTPUT BOX
+   ============================================================ */
+.output-box {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 0.8rem 1rem;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--accent2);
+  word-break: break-all;
+  min-height: 50px;
+  white-space: pre-wrap;
+  margin-top: 0.5rem;
+  position: relative;
+}
+
+.output-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-top: 1rem;
+  margin-bottom: 0.3rem;
+}
+
+/* Copy button inside output */
+.copy-btn {
+  position: absolute; top: 0.5rem; right: 0.5rem;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.6rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--muted);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ============================================================
+   KEY display (RSA)
+   ============================================================ */
+.key-box {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 0.6rem 0.8rem;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--accent3);
+  word-break: break-all;
+  max-height: 120px;
+  overflow-y: auto;
+  margin-bottom: 0.8rem;
+  white-space: pre-wrap;
+}
+
+/* ============================================================
+   HASH display – larger mono
+   ============================================================ */
+.hash-out {
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+}
+
+/* ============================================================
+   STATUS / TOAST
+   ============================================================ */
+.status {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 2px;
+  margin-top: 0.6rem;
+  display: none;
+}
+.status.ok  { background: rgba(0,255,153,0.1); color: var(--accent2); border: 1px solid rgba(0,255,153,0.3); display: block; }
+.status.err { background: rgba(255,60,60,0.1); color: #ff6060;        border: 1px solid rgba(255,60,60,0.3);  display: block; }
+
+/* ============================================================
+   DIVIDER
+   ============================================================ */
+hr.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.2rem 0;
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+footer {
+  position: relative; z-index: 10;
+  text-align: center;
+  padding: 1.5rem;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+
+/* ============================================================
+   SCROLLBAR STYLING
+   ============================================================ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header>
+  <div class="logo">⬡ CipherX</div>
+  <div class="subtitle">" SYMMETRIC · ASYMMETRIC · ENCODING · HASHING "</div>
+</header>
+
+<!-- ===== TAB NAVIGATION ===== -->
+<nav>
+  <button class="tab-btn active" onclick="switchTab('symmetric')">Symmetric</button>
+  <button class="tab-btn"        onclick="switchTab('asymmetric')">RSA</button>
+  <button class="tab-btn"        onclick="switchTab('encoding')">Encoding</button>
+  <button class="tab-btn"        onclick="switchTab('hashing')">Hashing</button>
+</nav>
+
+<!-- ===== MAIN ===== -->
+<main>
+
+  <!-- =========================================================
+       TAB 1 – SYMMETRIC ENCRYPTION (AES / DES / 3DES)
+       ========================================================= -->
+  <div id="tab-symmetric" class="tab-panel active">
+
+    <div class="card">
+      <div class="card-title">⬡ Symmetric Encryption / Decryption</div>
+
+      <!-- Algorithm selector -->
+      <label>Algorithm</label>
+      <select id="sym-algo">
+        <option value="AES">AES (Advanced Encryption Standard)</option>
+        <option value="DES">DES (Data Encryption Standard)</option>
+        <option value="TripleDES">3DES (Triple DES)</option>
+      </select>
+
+      <!-- Input + Key -->
+      <div class="row">
+        <div>
+          <label>Plaintext / Ciphertext</label>
+          <textarea id="sym-input" rows="3" placeholder="Enter your message here..."></textarea>
+        </div>
+        <div>
+          <label>Secret Key</label>
+          <!-- 
+            KEY NOTE:
+            – AES  accepts any length (CryptoJS pads internally)
+            – DES  needs 8 bytes
+            – 3DES needs 24 bytes
+            CryptoJS auto-handles the padding via MD5 key-stretching
+          -->
+          <input type="text" id="sym-key" placeholder="Enter secret key..."/>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <button class="btn"       onclick="symEncrypt()">🔒 Encrypt</button>
+      <button class="btn green" onclick="symDecrypt()">🔓 Decrypt</button>
+
+      <!-- Status message -->
+      <div id="sym-status" class="status"></div>
+
+      <!-- Output -->
+      <div class="output-label">Output</div>
+      <div class="output-box" id="sym-output">
+        <button class="copy-btn" onclick="copyText('sym-output')">COPY</button>
+        <span id="sym-output-text">—</span>
+      </div>
+    </div>
+
+  </div><!-- /tab-symmetric -->
+
+
+  <!-- =========================================================
+       TAB 2 – ASYMMETRIC (RSA)
+       ========================================================= -->
+  <div id="tab-asymmetric" class="tab-panel">
+
+    <!-- Key Generation -->
+    <div class="card orange">
+      <div class="card-title">⬡ RSA Key Generation</div>
+      <p style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem;">
+        <!-- 
+          RSA EXPLANATION:
+          We use the JSEncrypt library. It generates a 2048-bit key pair.
+          A "key pair" = one Public Key + one Private Key.
+          Public key  → used to ENCRYPT (share with everyone).
+          Private key → used to DECRYPT (keep secret).
+        -->
+        Generates a 2048-bit RSA key pair using JSEncrypt library.
+      </p>
+      <button class="btn orange full" onclick="generateRSAKeys()">⚙ Generate Key Pair</button>
+      <div id="rsa-gen-status" class="status"></div>
+
+      <label style="margin-top:1rem;">Public Key (share freely)</label>
+      <div class="key-box" id="rsa-pub">—</div>
+
+      <label>Private Key (keep secret!)</label>
+      <div class="key-box" id="rsa-priv">—</div>
+    </div>
+
+    <!-- RSA Encrypt -->
+    <div class="card orange">
+      <div class="card-title">⬡ RSA Encrypt</div>
+      <label>Message to Encrypt</label>
+      <textarea id="rsa-enc-input" rows="2" placeholder="Enter message..."></textarea>
+      <label>Public Key (paste here)</label>
+      <textarea id="rsa-enc-pub" rows="4" placeholder="Paste public key..."></textarea>
+      <button class="btn orange" onclick="rsaEncrypt()">🔒 Encrypt with Public Key</button>
+      <div id="rsa-enc-status" class="status"></div>
+      <div class="output-label">Ciphertext</div>
+      <div class="output-box">
+        <button class="copy-btn" onclick="copyText('rsa-enc-out')">COPY</button>
+        <span id="rsa-enc-out">—</span>
+      </div>
+    </div>
+
+    <!-- RSA Decrypt -->
+    <div class="card orange">
+      <div class="card-title">⬡ RSA Decrypt</div>
+      <label>Ciphertext to Decrypt</label>
+      <textarea id="rsa-dec-input" rows="3" placeholder="Paste ciphertext..."></textarea>
+      <label>Private Key (paste here)</label>
+      <textarea id="rsa-dec-priv" rows="4" placeholder="Paste private key..."></textarea>
+      <button class="btn orange" onclick="rsaDecrypt()">🔓 Decrypt with Private Key</button>
+      <div id="rsa-dec-status" class="status"></div>
+      <div class="output-label">Decrypted Message</div>
+      <div class="output-box">
+        <button class="copy-btn" onclick="copyText('rsa-dec-out')">COPY</button>
+        <span id="rsa-dec-out">—</span>
+      </div>
+    </div>
+
+  </div><!-- /tab-asymmetric -->
+
+
+  <!-- =========================================================
+       TAB 3 – ENCODING / DECODING
+       ========================================================= -->
+  <div id="tab-encoding" class="tab-panel">
+
+    <div class="card green">
+      <div class="card-title">⬡ Encoding / Decoding</div>
+
+      <label>Encoding Scheme</label>
+      <select id="enc-algo">
+        <!-- 
+          Base64:  converts binary data → ASCII string using 64 printable chars.
+          Hex:     converts each character to its hexadecimal byte value.
+          URL:     encodes special characters so they are safe in URLs (e.g. space → %20).
+        -->
+        <option value="base64">Base64</option>
+        <option value="hex">Hex</option>
+        <option value="url">URL Encoding</option>
+      </select>
+
+      <label>Input Text</label>
+      <textarea id="enc-input" rows="3" placeholder="Enter text to encode/decode..."></textarea>
+
+      <button class="btn green" onclick="encEncode()">📤 Encode</button>
+      <button class="btn"       onclick="encDecode()">📥 Decode</button>
+
+      <div id="enc-status" class="status"></div>
+
+      <div class="output-label">Output</div>
+      <div class="output-box">
+        <button class="copy-btn" onclick="copyText('enc-out')">COPY</button>
+        <span id="enc-out">—</span>
+      </div>
+    </div>
+
+  </div><!-- /tab-encoding -->
+
+
+  <!-- =========================================================
+       TAB 4 – HASHING
+       ========================================================= -->
+  <div id="tab-hashing" class="tab-panel">
+
+    <div class="card">
+      <div class="card-title">⬡ Hashing</div>
+      <p style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem;">
+        <!-- 
+          HASHING is a ONE-WAY operation.
+          The same input always produces the same hash (deterministic).
+          You CANNOT reverse a hash to get the original text.
+          Salted hashing adds a random string before hashing to prevent rainbow-table attacks.
+        -->
+        One-way transformation. SHA-256 produces a 256-bit digest; SHA-512 a 512-bit digest.
+        Salted hashing adds a random prefix to defeat lookup-table attacks.
+      </p>
+
+      <label>Hash Algorithm</label>
+      <select id="hash-algo">
+        <option value="SHA256">SHA-256</option>
+        <option value="SHA512">SHA-512</option>
+        <option value="salted">Salted Hashing (SHA-256 + random salt)</option>
+      </select>
+
+      <label>Input Text</label>
+      <textarea id="hash-input" rows="3" placeholder="Enter text to hash..."></textarea>
+
+      <!-- Salt field – only visible for salted mode -->
+      <div id="salt-row" style="display:none;">
+        <label>Salt (auto-generated or custom)</label>
+        <div class="row">
+          <input type="text" id="hash-salt" placeholder="Salt will appear here..."/>
+          <button class="btn" style="margin-top:0;height:38px;flex:0 0 auto" onclick="genSalt()">🎲 New Salt</button>
+        </div>
+      </div>
+
+      <button class="btn full" onclick="computeHash()">⚡ Compute Hash</button>
+
+      <div id="hash-status" class="status"></div>
+
+      <div class="output-label">Hash Output</div>
+      <div class="output-box hash-out">
+        <button class="copy-btn" onclick="copyText('hash-out')">COPY</button>
+        <span id="hash-out">—</span>
+      </div>
+    </div>
+
+  </div><!-- /tab-hashing -->
+
+</main>
+
+<!-- ===== FOOTER ===== -->
+<footer>CRYPTO TOOLKIT · AES · DES · 3DES · RSA · BASE64 · HEX · URL · SHA-256 · SHA-512 · SALTED HASHING</footer>
+
+
+<!-- =========================================================
+     JAVASCRIPT
+     ========================================================= -->
+<script>
+
+/* ----------------------------------------------------------
+   TAB SWITCHING
+   ---------------------------------------------------------- */
+function switchTab(name) {
+  // Hide all panels and deactivate all buttons
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+  // Show selected panel and activate matching button
+  document.getElementById('tab-' + name).classList.add('active');
+  // Find which button triggered this (by matching onclick text)
+  event.target.classList.add('active');
+}
+
+/* ----------------------------------------------------------
+   UTILITY – show status message
+   ---------------------------------------------------------- */
+function setStatus(id, msg, isOk) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = 'status ' + (isOk ? 'ok' : 'err');
+}
+
+/* ----------------------------------------------------------
+   UTILITY – copy output text to clipboard
+   ---------------------------------------------------------- */
+function copyText(spanId) {
+  const text = document.getElementById(spanId).textContent;
+  navigator.clipboard.writeText(text).catch(() => {});
+}
+
+/* ==========================================================
+   1. SYMMETRIC ENCRYPTION / DECRYPTION
+   
+   CryptoJS library documentation:
+   https://cryptojs.gitbook.io/docs/
+
+   How CryptoJS works here:
+   - CryptoJS.AES.encrypt(message, key)  → returns a CipherParams object
+   - .toString()                          → serializes to OpenSSL-compatible string
+   - CryptoJS.AES.decrypt(ciphertext, key) → returns WordArray
+   - .toString(CryptoJS.enc.Utf8)          → converts back to readable string
+
+   Same pattern applies for DES and TripleDES.
+   ========================================================== */
+
+function symEncrypt() {
+  const algo  = document.getElementById('sym-algo').value;   // e.g. "AES"
+  const input = document.getElementById('sym-input').value.trim();
+  const key   = document.getElementById('sym-key').value.trim();
+
+  // Input validation
+  if (!input || !key) {
+    setStatus('sym-status', '⚠ Please fill in both plaintext and key.', false);
+    return;
+  }
+
+  try {
+    // CryptoJS[algo] accesses CryptoJS.AES / CryptoJS.DES / CryptoJS.TripleDES dynamically
+    const encrypted = CryptoJS[algo].encrypt(input, key).toString();
+    document.getElementById('sym-output-text').textContent = encrypted;
+    setStatus('sym-status', `✓ Encrypted with ${algo} successfully.`, true);
+  } catch(e) {
+    setStatus('sym-status', '✗ Encryption failed: ' + e.message, false);
+  }
+}
+
+function symDecrypt() {
+  const algo  = document.getElementById('sym-algo').value;
+  const input = document.getElementById('sym-input').value.trim();
+  const key   = document.getElementById('sym-key').value.trim();
+
+  if (!input || !key) {
+    setStatus('sym-status', '⚠ Please fill in both ciphertext and key.', false);
+    return;
+  }
+
+  try {
+    // decrypt() returns a WordArray; convert to UTF-8 string
+    const decrypted = CryptoJS[algo].decrypt(input, key).toString(CryptoJS.enc.Utf8);
+
+    if (!decrypted) {
+      setStatus('sym-status', '✗ Decryption failed: wrong key or corrupted ciphertext.', false);
+      return;
+    }
+
+    document.getElementById('sym-output-text').textContent = decrypted;
+    setStatus('sym-status', `✓ Decrypted with ${algo} successfully.`, true);
+  } catch(e) {
+    setStatus('sym-status', '✗ Decryption error: ' + e.message, false);
+  }
+}
+
+
+/* ==========================================================
+   2. RSA (ASYMMETRIC)
+
+   We use the JSEncrypt library (wrapper around forge / JSBN).
+
+   WORKFLOW:
+   1. Generate key pair → store public + private PEM strings
+   2. Encrypt:  create JSEncrypt instance → setPublicKey(pem) → encrypt(msg)
+   3. Decrypt:  create JSEncrypt instance → setPrivateKey(pem) → decrypt(cipher)
+
+   PEM format: -----BEGIN RSA PUBLIC KEY----- ... -----END RSA PUBLIC KEY-----
+   Base64-encoded DER structure inside.
+
+   LIMITATION: RSA can only encrypt data shorter than the key size minus padding.
+   For 2048-bit key → max ~214 bytes of plaintext with PKCS#1 v1.5 padding.
+   ========================================================== */
+
+let rsaPublicKey  = '';   // stored so user can auto-fill encrypt tab
+let rsaPrivateKey = '';
+
+function generateRSAKeys() {
+  setStatus('rsa-gen-status', '⏳ Generating 2048-bit key pair... (this may take a moment)', true);
+
+  // Small timeout so the status message renders before blocking computation
+  setTimeout(() => {
+    try {
+      const crypt = new JSEncrypt({ default_key_size: 2048 });
+      crypt.getKey();  // triggers key generation
+
+      rsaPublicKey  = crypt.getPublicKey();
+      rsaPrivateKey = crypt.getPrivateKey();
+
+      document.getElementById('rsa-pub').textContent  = rsaPublicKey;
+      document.getElementById('rsa-priv').textContent = rsaPrivateKey;
+
+      // Auto-populate the encrypt/decrypt forms for convenience
+      document.getElementById('rsa-enc-pub').value  = rsaPublicKey;
+      document.getElementById('rsa-dec-priv').value = rsaPrivateKey;
+
+      setStatus('rsa-gen-status', '✓ 2048-bit RSA key pair generated.', true);
+    } catch(e) {
+      setStatus('rsa-gen-status', '✗ Key generation failed: ' + e.message, false);
+    }
+  }, 50);
+}
+
+function rsaEncrypt() {
+  const msg    = document.getElementById('rsa-enc-input').value.trim();
+  const pubKey = document.getElementById('rsa-enc-pub').value.trim();
+
+  if (!msg || !pubKey) {
+    setStatus('rsa-enc-status', '⚠ Provide both message and public key.', false);
+    return;
+  }
+
+  try {
+    const encrypt = new JSEncrypt();
+    encrypt.setPublicKey(pubKey);
+    const result = encrypt.encrypt(msg);  // returns Base64 ciphertext or false
+
+    if (!result) {
+      setStatus('rsa-enc-status', '✗ Encryption failed. Check your public key.', false);
+      return;
+    }
+
+    document.getElementById('rsa-enc-out').textContent = result;
+    setStatus('rsa-enc-status', '✓ Encrypted with RSA public key.', true);
+  } catch(e) {
+    setStatus('rsa-enc-status', '✗ Error: ' + e.message, false);
+  }
+}
+
+function rsaDecrypt() {
+  const cipher  = document.getElementById('rsa-dec-input').value.trim();
+  const privKey = document.getElementById('rsa-dec-priv').value.trim();
+
+  if (!cipher || !privKey) {
+    setStatus('rsa-dec-status', '⚠ Provide both ciphertext and private key.', false);
+    return;
+  }
+
+  try {
+    const decrypt = new JSEncrypt();
+    decrypt.setPrivateKey(privKey);
+    const result = decrypt.decrypt(cipher);  // returns plaintext string or false
+
+    if (!result) {
+      setStatus('rsa-dec-status', '✗ Decryption failed. Check your private key.', false);
+      return;
+    }
+
+    document.getElementById('rsa-dec-out').textContent = result;
+    setStatus('rsa-dec-status', '✓ Decrypted with RSA private key.', true);
+  } catch(e) {
+    setStatus('rsa-dec-status', '✗ Error: ' + e.message, false);
+  }
+}
+
+
+/* ==========================================================
+   3. ENCODING / DECODING
+
+   Base64:
+     btoa(str)  – encode  (binary to ASCII)
+     atob(str)  – decode  (ASCII to binary)
+     
+     IMPORTANT: btoa only handles Latin-1 characters. For Unicode
+     text we use encodeURIComponent + escape trick.
+
+   Hex:
+     Each character has a Unicode code point (e.g. 'A' = 65 = 0x41).
+     Encoding: map each char → charCode → hex string (padded to 2 digits).
+     Decoding: split every 2 chars → parseInt(hex, 16) → char.
+
+   URL:
+     encodeURIComponent(str) – encodes all special chars except A-Z a-z 0-9 - _ . ! ~ * ' ( )
+     decodeURIComponent(str) – reverses it.
+     Space becomes %20, & becomes %26, etc.
+   ========================================================== */
+
+function encEncode() {
+  const scheme = document.getElementById('enc-algo').value;
+  const text   = document.getElementById('enc-input').value;
+
+  if (!text) { setStatus('enc-status','⚠ Enter some text first.', false); return; }
+
+  try {
+    let result;
+    if (scheme === 'base64') {
+      // Unicode-safe Base64 encode
+      result = btoa(unescape(encodeURIComponent(text)));
+    } else if (scheme === 'hex') {
+      // Convert each character to its 2-digit hex representation
+      result = Array.from(text)
+                 .map(c => c.charCodeAt(0).toString(16).padStart(2,'0'))
+                 .join('');
+    } else {  // url
+      result = encodeURIComponent(text);
+    }
+    document.getElementById('enc-out').textContent = result;
+    setStatus('enc-status', `✓ Encoded as ${scheme.toUpperCase()}.`, true);
+  } catch(e) {
+    setStatus('enc-status', '✗ Encode error: ' + e.message, false);
+  }
+}
+
+function encDecode() {
+  const scheme = document.getElementById('enc-algo').value;
+  const text   = document.getElementById('enc-input').value.trim();
+
+  if (!text) { setStatus('enc-status','⚠ Enter encoded text first.', false); return; }
+
+  try {
+    let result;
+    if (scheme === 'base64') {
+      // Unicode-safe Base64 decode
+      result = decodeURIComponent(escape(atob(text)));
+    } else if (scheme === 'hex') {
+      // Split into pairs of hex digits, convert each to char
+      if (text.length % 2 !== 0) throw new Error('Invalid hex string length.');
+      result = text.match(/.{2}/g)
+                   .map(h => String.fromCharCode(parseInt(h, 16)))
+                   .join('');
+    } else {  // url
+      result = decodeURIComponent(text);
+    }
+    document.getElementById('enc-out').textContent = result;
+    setStatus('enc-status', `✓ Decoded from ${scheme.toUpperCase()}.`, true);
+  } catch(e) {
+    setStatus('enc-status', '✗ Decode error: ' + e.message, false);
+  }
+}
+
+
+/* ==========================================================
+   4. HASHING
+
+   SHA-256: produces a 256-bit (64 hex chars) digest.
+   SHA-512: produces a 512-bit (128 hex chars) digest.
+   
+   Salted hashing:
+     salt = random 16-byte value (here as hex string)
+     stored_hash = SHA256(salt + password)
+     To verify: re-hash (salt + input) and compare.
+     WHY SALT? Without it, identical passwords produce identical hashes.
+     An attacker with a pre-computed rainbow table can instantly crack them.
+     A random salt makes each hash unique even for identical inputs.
+   ========================================================== */
+
+// Show/hide salt input based on selected algorithm
+document.getElementById('hash-algo').addEventListener('change', function() {
+  document.getElementById('salt-row').style.display =
+    this.value === 'salted' ? 'block' : 'none';
+  if (this.value === 'salted') genSalt();
+});
+
+// Generate a cryptographically random 16-byte salt as hex string
+function genSalt() {
+  const arr = new Uint8Array(16);
+  window.crypto.getRandomValues(arr);  // Web Crypto API – truly random
+  document.getElementById('hash-salt').value =
+    Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function computeHash() {
+  const algo  = document.getElementById('hash-algo').value;
+  const input = document.getElementById('hash-input').value;
+
+  if (!input) { setStatus('hash-status','⚠ Enter text to hash.', false); return; }
+
+  try {
+    let result;
+
+    if (algo === 'SHA256') {
+      // CryptoJS.SHA256 returns a WordArray; .toString() gives lowercase hex
+      result = CryptoJS.SHA256(input).toString();
+
+    } else if (algo === 'SHA512') {
+      result = CryptoJS.SHA512(input).toString();
+
+    } else {
+      // Salted SHA-256
+      let salt = document.getElementById('hash-salt').value.trim();
+      if (!salt) { genSalt(); salt = document.getElementById('hash-salt').value; }
+
+      // Concatenate salt + input, then hash
+      const salted = salt + input;
+      const hash   = CryptoJS.SHA256(salted).toString();
+
+      // Display both salt and hash so user can store/verify later
+      result = `SALT:  ${salt}\nHASH:  ${hash}`;
+    }
+
+    document.getElementById('hash-out').textContent = result;
+    setStatus('hash-status', `✓ Hash computed using ${algo}.`, true);
+  } catch(e) {
+    setStatus('hash-status', '✗ Hashing error: ' + e.message, false);
+  }
+}
+
+</script>
+</body>
+</html>
